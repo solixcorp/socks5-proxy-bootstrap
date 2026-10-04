@@ -1,6 +1,6 @@
 # Debian SOCKS5 Proxy
 
-빈 Debian 서버에 인증이 필요한 Dante SOCKS5 프록시를 설치합니다. 저장소를 clone하지 않고 GitHub Personal Access Token(PAT)으로 스크립트 하나만 다운로드해서 실행할 수 있습니다.
+빈 Debian 서버에 인증이 필요한 Dante SOCKS5 프록시를 설치합니다. 공개 저장소에서 스크립트를 다운로드해 실행하므로 git clone이나 GitHub 인증 토큰이 필요하지 않습니다.
 
 ## 동작
 
@@ -34,35 +34,16 @@ apt-get update && apt-get install -y curl ca-certificates
 
 일반 사용자라면 두 명령 앞에 각각 `sudo`를 붙이세요.
 
-## GitHub PAT 발급
+## 한 줄 실행 명령어
 
-발급 페이지: <https://github.com/settings/personal-access-tokens/new>
+아래 명령어를 **Bash 터미널**에 붙여 넣으세요. GitHub의 `blob` 페이지는 HTML이므로, 파일 원문을 제공하는 `raw.githubusercontent.com` 주소를 사용합니다.
 
-GitHub **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**에서도 접근할 수 있습니다.
-
-| 항목 | 권장 설정 |
-| --- | --- |
-| Token name | `socks5-installer` |
-| Expiration | 필요한 기간만큼 짧게 |
-| Resource owner | `solixcorp` |
-| Repository access | **Only select repositories** |
-| 선택할 저장소 | `socks5-proxy-bootstrap` |
-| Repository permissions → Contents | **Read-only** |
-
-`Metadata: Read-only`는 자동 포함됩니다. 다른 권한은 필요하지 않습니다. 조직 정책에 따라 관리자 승인이 필요하거나 발급이 제한될 수 있습니다. `solixcorp`가 보이지 않으면 조직 멤버십과 토큰 정책을 확인하세요.
-
-생성 직후 표시되는 토큰을 복사하세요. 토큰을 README나 저장소에 넣지 마세요.
-
-## 권장: 실행 시 PAT를 입력하는 한 줄 명령어
-
-아래 명령어를 **Bash 터미널**에 붙여 넣으면 `GitHub PAT:` 입력창이 나옵니다. 토큰을 붙여 넣고 Enter를 누르세요. 입력한 토큰은 화면에 표시되지 않습니다.
-
-명령어 자체에 토큰이 없으므로 셸 히스토리에 토큰을 직접 남기지 않습니다. 인증 헤더는 표준 입력으로 curl에 전달하여 curl 실행 인자에도 토큰을 넣지 않습니다. 다운로드 실패 시 실행하지 않고, 종료 시 임시 파일을 제거합니다. 일반 사용자로 실행하면 별도로 sudo 비밀번호가 필요할 수 있습니다.
+토큰 입력 없이 다운로드한 내용을 바로 root 권한으로 실행합니다. root로 접속한 서버에서는 `sudo bash` 대신 `bash`를 사용하세요. 아래 명령어는 Bash의 `pipefail`로 다운로드 오류를 종료 상태에 반영하지만, 다운로드 완료 전에 실행이 시작될 수 있습니다.
 
 ### 설치
 
 ```bash
-( set -euo pipefail; umask 077; read -rsp 'GitHub PAT: ' PAT; echo; FILE=$(mktemp); trap 'rm -f "$FILE"; unset PAT' EXIT; printf 'header = "Authorization: Bearer %s"\n' "$PAT" | curl --config - -fsS -H 'Accept: application/vnd.github.raw+json' 'https://api.github.com/repos/solixcorp/socks5-proxy-bootstrap/contents/setup.sh?ref=main' -o "$FILE"; unset PAT; if (( EUID == 0 )); then bash "$FILE"; else sudo bash "$FILE"; fi )
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/solixcorp/socks5-proxy-bootstrap/main/setup.sh | sudo bash )
 ```
 
 설치 스크립트를 재실행하면 포트와 비밀번호가 새로 생성됩니다. 기존 `danted.service`와 이전 버전의 `random-socks5.service`는 중단됩니다. 다른 Dante 서비스를 운영 중인 서버에는 주의해서 사용하세요.
@@ -70,7 +51,7 @@ GitHub **Settings → Developer settings → Personal access tokens → Fine-gra
 ### 포트·비밀번호 리셋
 
 ```bash
-( set -euo pipefail; umask 077; read -rsp 'GitHub PAT: ' PAT; echo; FILE=$(mktemp); trap 'rm -f "$FILE"; unset PAT' EXIT; printf 'header = "Authorization: Bearer %s"\n' "$PAT" | curl --config - -fsS -H 'Accept: application/vnd.github.raw+json' 'https://api.github.com/repos/solixcorp/socks5-proxy-bootstrap/contents/reset.sh?ref=main' -o "$FILE"; unset PAT; if (( EUID == 0 )); then bash "$FILE"; else sudo bash "$FILE"; fi )
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/solixcorp/socks5-proxy-bootstrap/main/reset.sh | sudo bash )
 ```
 
 `proxyauthuser`와 기존 접근 규칙은 유지합니다. 새 포트와 비밀번호를 생성하고 접속 정보 파일을 갱신합니다. 적용 중 실패하면 기존 설정과 비밀번호 해시 복원을 시도합니다.
@@ -80,20 +61,10 @@ GitHub **Settings → Developer settings → Personal access tokens → Fine-gra
 ### 삭제
 
 ```bash
-( set -euo pipefail; umask 077; read -rsp 'GitHub PAT: ' PAT; echo; FILE=$(mktemp); trap 'rm -f "$FILE"; unset PAT' EXIT; printf 'header = "Authorization: Bearer %s"\n' "$PAT" | curl --config - -fsS -H 'Accept: application/vnd.github.raw+json' 'https://api.github.com/repos/solixcorp/socks5-proxy-bootstrap/contents/uninstall.sh?ref=main' -o "$FILE"; unset PAT; if (( EUID == 0 )); then bash "$FILE"; else sudo bash "$FILE"; fi )
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/solixcorp/socks5-proxy-bootstrap/main/uninstall.sh | sudo bash )
 ```
 
 확인 질문 없이 서비스를 중단하고 관련 파일과 `proxyauthuser` 계정을 삭제합니다. 패키지, 홈 디렉터리, 방화벽·보안 그룹 규칙은 삭제하지 않습니다. 이전 버전의 파일과 계정은 별도로 정리해야 합니다.
-
-## 선택: PAT를 미리 포함하는 버전
-
-추가 입력 없이 실행하려면 아래 `YOUR_GITHUB_TOKEN`을 토큰으로 바꿀 수 있습니다. **이 방식은 토큰이 셸 히스토리·터미널 기록에 남을 수 있으므로 권장하지 않습니다. 실제 토큰이 들어간 명령어를 공유하거나 커밋하지 마세요.**
-
-```bash
-( set -euo pipefail; umask 077; FILE=$(mktemp); trap 'rm -f "$FILE"' EXIT; printf '%s\n' 'header = "Authorization: Bearer YOUR_GITHUB_TOKEN"' | curl --config - -fsS -H 'Accept: application/vnd.github.raw+json' 'https://api.github.com/repos/solixcorp/socks5-proxy-bootstrap/contents/setup.sh?ref=main' -o "$FILE"; if (( EUID == 0 )); then bash "$FILE"; else sudo bash "$FILE"; fi )
-```
-
-리셋·삭제는 URL의 `setup.sh`를 각각 `reset.sh`, `uninstall.sh`로 바꾸세요.
 
 ## 출력 예시
 
@@ -119,8 +90,7 @@ sudo journalctl -u socks5-proxy -f
 
 ## 보안 및 운영 주의사항
 
-- 원격 코드를 root로 실행합니다. 신뢰할 수 있는 저장소에서만 실행하세요. 명령어는 `main`의 최신 파일을 사용합니다. 검토한 버전을 고정하려면 URL의 `ref=main`을 `ref=커밋SHA`로 바꾸세요.
-- 토큰 입력 시 셸의 디버그 추적(`set -x`)을 사용하지 마세요. PAT는 제한된 권한과 짧은 만료 기간으로 발급하고 필요 없으면 폐기하세요.
+- 원격 코드를 root로 실행합니다. 신뢰할 수 있는 저장소에서만 실행하세요. 명령어는 `main`의 최신 파일을 사용합니다. 검토한 버전을 고정하려면 URL의 `/main/`을 `/커밋SHA/`로 바꾸세요.
 - SOCKS5 사용자명·비밀번호 인증은 클라이언트와 프록시 사이의 암호화를 제공하지 않습니다. 안전한 전송이 필요하면 VPN이나 SSH 터널을 사용하세요.
 - 랜덤 포트는 보안 경계가 아닙니다. 가능한 경우 방화벽·보안 그룹에서 접속할 출발지 IP만 허용하세요. 스크립트는 방화벽을 자동 설정하지 않습니다.
 - 서버의 모든 IPv4 인터페이스에서 접속을 받습니다. 인증된 사용자는 서버가 접근 가능한 내부망에도 요청할 수 있습니다. 필요하면 목적지 접근 규칙을 제한하세요.
@@ -130,4 +100,4 @@ sudo journalctl -u socks5-proxy -f
 
 ## 원격 실행 전 반영
 
-새 파일과 이름 변경은 GitHub에 push되어야 다운로드할 수 있습니다. 로컬에서만 변경한 파일은 위 명령어로 받을 수 없습니다.
+위 명령어는 저장소가 public으로 공개되어 있고 해당 파일이 GitHub에 반영되어 있어야 동작합니다. 로컬에서만 변경한 파일은 다운로드되지 않습니다.
