@@ -15,8 +15,13 @@
 - 비밀번호: `openssl rand -hex 16`으로 생성한 32자리 문자열(128비트 난수)
 - 서비스: `socks5-proxy.service`
 - 설정: `/etc/socks5-proxy.conf`
+- 설치 방식: apt에 `dante-server`가 있으면 패키지 설치, 없으면 공식 Dante 1.4.4 소스를 SHA-256 검증 후 빌드
+- 소스 설치 경로: `/opt/socks5-proxy` (Debian 13 trixie 등 패키지가 없는 환경)
+
 - 접속 정보: `/root/socks5-credentials.txt`, `/etc/socks5-proxy.env` (권한 `600`)
 - URL: `socks5://proxyauthuser:PASSWORD@SERVER_IP:PORT`
+
+소스 설치는 `build-essential`을 추가 설치하며, 서버 성능에 따라 시간이 걸릴 수 있습니다. 다른 Debian 릴리스의 저장소를 섞지 않습니다.
 
 공인 IPv4는 `https://api.ipify.org`에서 조회합니다. 조회에 실패하면 URL에 `YOUR_SERVER_IP`가 표시되므로 실제 서버 주소로 바꾸세요. NAT 환경에서는 조회된 주소가 실제 인바운드 접속 주소인지 확인해야 합니다.
 
@@ -64,7 +69,7 @@ apt-get update && apt-get install -y curl ca-certificates
 ( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/solixcorp/socks5-proxy-bootstrap/main/uninstall.sh | sudo bash )
 ```
 
-확인 질문 없이 서비스를 중단하고 관련 파일과 `proxyauthuser` 계정을 삭제합니다. 패키지, 홈 디렉터리, 방화벽·보안 그룹 규칙은 삭제하지 않습니다. 이전 버전의 파일과 계정은 별도로 정리해야 합니다.
+확인 질문 없이 서비스를 중단하고 관련 파일과 `proxyauthuser` 계정을 삭제합니다. 소스 설치한 경우 `/opt/socks5-proxy`도 삭제합니다. apt 패키지(빌드 도구 포함), 홈 디렉터리, 방화벽·보안 그룹 규칙은 삭제하지 않습니다. 이전 버전의 파일과 계정은 별도로 정리해야 합니다.
 
 ## 출력 예시
 

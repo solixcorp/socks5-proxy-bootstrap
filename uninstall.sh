@@ -22,6 +22,8 @@ systemctl daemon-reload
 systemctl reset-failed "$SERVICE" 2>/dev/null || true
 
 rm -f -- /etc/socks5-proxy.conf /etc/socks5-proxy.env /root/socks5-credentials.txt
+# Remove only the dedicated source-install prefix, not system packages.
+rm -rf -- /opt/socks5-proxy
 
 # Keep home directories and never force-delete an account with running processes.
 if id "$SOCKS_USER" >/dev/null 2>&1; then

@@ -23,7 +23,40 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "[1/7] Installing packages..."
 apt-get update
-apt-get install -y dante-server openssl iproute2 curl
+apt-get install -y openssl iproute2 curl ca-certificates
+
+if apt-cache policy dante-server | grep -E 'Candidate: .*[0-9]' >/dev/null; then
+    apt-get install -y dante-server
+    DANTED_BIN="/usr/sbin/danted"
+else
+    echo "dante-server is unavailable; building official Dante 1.4.4 source..."
+    apt-get install -y build-essential
+    BUILD_DIR="$(mktemp -d)"
+    trap 'rm -rf -- "$BUILD_DIR"' EXIT
+    curl -fsSL --retry 3 https://www.inet.no/dante/files/dante-1.4.4.tar.gz \
+        -o "$BUILD_DIR/dante.tar.gz"
+    printf '%s  %s\n' \
+        '1973c7732f1f9f0a4c0ccf2c1ce462c7c25060b25643ea90f9b98f53a813faec' \
+        "$BUILD_DIR/dante.tar.gz" | sha256sum --check -
+    tar -xzf "$BUILD_DIR/dante.tar.gz" -C "$BUILD_DIR"
+    (
+        cd "$BUILD_DIR/dante-1.4.4"
+        # Build only the server, in an isolated prefix owned by this installer.
+        ./configure --prefix=/opt/socks5-proxy --disable-client --disable-preload
+        make -j "$(nproc)"
+        make install
+    )
+    DANTED_BIN="/opt/socks5-proxy/sbin/sockd"
+    # umask 077 also affects make install; allow the unprivileged daemon to traverse.
+    chmod 755 /opt/socks5-proxy /opt/socks5-proxy/sbin "$DANTED_BIN"
+    rm -rf -- "$BUILD_DIR"
+    trap - EXIT
+fi
+
+if [[ ! -x "$DANTED_BIN" ]]; then
+    echo "ERROR: Dante server executable not found: $DANTED_BIN"
+    exit 1
+fi
 
 # 기존 기본 danted 서비스와 충돌 방지
 systemctl disable --now danted.service 2>/dev/null || true
@@ -65,7 +98,7 @@ echo "[3/7] Generating random SOCKS5 port..."
 while true; do
     SOCKS_PORT="$(shuf -i 20000-60000 -n 1)"
 
-    if ! ss -ltnH | awk '{print $4}' | grep -qE ":${SOCKS_PORT}$"; then
+    if ! ss -ltnH | awk '{print $4}' | grep -E ":${SOCKS_PORT}$" >/dev/null; then
         break
     fi
 done
@@ -124,12 +157,12 @@ EOF
 chmod 600 /etc/socks5-proxy.conf
 
 # 설정 오류가 있으면 서비스 등록 전에 중단
-/usr/sbin/danted -V -f /etc/socks5-proxy.conf
+"$DANTED_BIN" -V -f /etc/socks5-proxy.conf
 
 
 echo "[6/7] Creating systemd service..."
 
-cat > /etc/systemd/system/socks5-proxy.service <<'EOF'
+cat > /etc/systemd/system/socks5-proxy.service <<EOF
 [Unit]
 Description=SOCKS5 Proxy
 After=network-online.target
@@ -138,7 +171,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/danted -f /etc/socks5-proxy.conf
+ExecStart=${DANTED_BIN} -f /etc/socks5-proxy.conf
 Restart=always
 RestartSec=2
 

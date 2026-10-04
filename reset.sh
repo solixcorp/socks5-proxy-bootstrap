@@ -82,7 +82,16 @@ if ! grep -Fx "internal: 0.0.0.0 port = ${SOCKS_PORT}" "$WORK_DIR/new-config" >/
     echo "ERROR: Could not update the listener port."
     exit 1
 fi
-/usr/sbin/danted -V -f "$WORK_DIR/new-config"
+DANTED_BIN="$(systemctl show "$SERVICE" --property=ExecStart --value | sed -n 's/.*path=\([^ ;]*\).*/\1/p')"
+case "$DANTED_BIN" in
+    /usr/sbin/danted|/opt/socks5-proxy/sbin/sockd) ;;
+    *) echo "ERROR: Unexpected Dante executable in service definition."; exit 1 ;;
+esac
+if [[ ! -x "$DANTED_BIN" ]]; then
+    echo "ERROR: Dante executable not found: $DANTED_BIN"
+    exit 1
+fi
+"$DANTED_BIN" -V -f "$WORK_DIR/new-config"
 
 cat > "$WORK_DIR/new-env" <<EOF
 SOCKS_PORT=${SOCKS_PORT}
